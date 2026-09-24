@@ -1,0 +1,206 @@
+{
+  "version": "behavior-v1",
+  "cases": [
+    {
+      "id": "low-False",
+      "request": {
+        "objective": "Improve onboarding",
+        "context": {
+          "details": "Needs onboarding help"
+        },
+        "outcome_signals": {
+          "engagement": "low",
+          "last_action_success": false
+        },
+        "documents": [
+          {
+            "id": "guide",
+            "text": "onboarding help"
+          },
+          {
+            "id": "garden",
+            "text": "soil flowers"
+          }
+        ]
+      },
+      "expected_action": "Offer assistance and ask one clarifying question",
+      "expected_sources": [
+        "guide"
+      ],
+      "expected_tools": [
+        "draft_message",
+        "create_follow_up"
+      ]
+    },
+    {
+      "id": "low-True",
+      "request": {
+        "objective": "Improve onboarding",
+        "context": {
+          "details": "Needs onboarding help"
+        },
+        "outcome_signals": {
+          "engagement": "low",
+          "last_action_success": true
+        },
+        "documents": [
+          {
+            "id": "guide",
+            "text": "onboarding help"
+          },
+          {
+            "id": "garden",
+            "text": "soil flowers"
+          }
+        ]
+      },
+      "expected_action": "Offer assistance and ask one clarifying question",
+      "expected_sources": [
+        "guide"
+      ],
+      "expected_tools": [
+        "draft_message",
+        "create_follow_up"
+      ]
+    },
+    {
+      "id": "medium-False",
+      "request": {
+        "objective": "Improve onboarding",
+        "context": {
+          "details": "Needs onboarding help"
+        },
+        "outcome_signals": {
+          "engagement": "medium",
+          "last_action_success": false
+        },
+        "documents": [
+          {
+            "id": "guide",
+            "text": "onboarding help"
+          },
+          {
+            "id": "garden",
+            "text": "soil flowers"
+          }
+        ]
+      },
+      "expected_action": "Offer assistance and ask one clarifying question",
+      "expected_sources": [
+        "guide"
+      ],
+      "expected_tools": [
+        "draft_message",
+        "create_follow_up"
+      ]
+    },
+    {
+      "id": "medium-True",
+      "request": {
+        "objective": "Improve onboarding",
+        "context": {
+          "details": "Needs onboarding help"
+        },
+        "outcome_signals": {
+          "engagement": "medium",
+          "last_action_success": true
+        },
+        "documents": [
+          {
+            "id": "guide",
+            "text": "onboarding help"
+          },
+          {
+            "id": "garden",
+            "text": "soil flowers"
+          }
+        ]
+      },
+      "expected_action": "Suggest a focused next step",
+      "expected_sources": [
+        "guide"
+      ],
+      "expected_tools": [
+        "draft_message",
+        "create_follow_up"
+      ]
+    },
+    {
+      "id": "high-False",
+      "request": {
+        "objective": "Improve onboarding",
+        "context": {
+          "details": "Needs onboarding help"
+        },
+        "outcome_signals": {
+          "engagement": "high",
+          "last_action_success": false
+        },
+        "documents": [
+          {
+            "id": "guide",
+            "text": "onboarding help"
+          },
+          {
+            "id": "garden",
+            "text": "soil flowers"
+          }
+        ]
+      },
+      "expected_action": "Offer assistance and ask one clarifying question",
+      "expected_sources": [
+        "guide"
+      ],
+      "expected_tools": [
+        "draft_message",
+        "create_follow_up"
+      ]
+    },
+    {
+      "id": "high-True",
+      "request": {
+        "objective": "Improve onboarding",
+        "context": {
+          "details": "Needs onboarding help"
+        },
+        "outcome_signals": {
+          "engagement": "high",
+          "last_action_success": true
+        },
+        "documents": [
+          {
+            "id": "guide",
+            "text": "onboarding help"
+          },
+          {
+            "id": "garden",
+            "text": "soil flowers"
+          }
+        ]
+      },
+      "expected_action": "Suggest a focused next step",
+      "expected_sources": [
+        "guide"
+      ],
+      "expected_tools": [
+        "draft_message",
+        "create_follow_up"
+      ]
+    },
+    {
+      "id": "no-evidence",
+      "request": {
+        "objective": "onboarding",
+        "context": {
+          "details": "help"
+        }
+      },
+      "expected_action": "Suggest a focused next step",
+      "expected_sources": [],
+      "expected_tools": [
+        "draft_message",
+        "create_follow_up"
+      ]
+    }
+  ]
+}
