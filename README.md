@@ -202,3 +202,16 @@ CI repeats the suite on Python 3.11–3.13. Evidence and limitations are in `doc
 For a live load sample, start Uvicorn on port 8765 and run
 `python scripts/load.py --output load.json`. Raw timings and environment metadata
 are recorded; this is a local diagnostic, not a production capacity benchmark.
+
+### Stage 2: durable storage
+
+Export `DATABASE_URL`, run `python -m app.postgres` to apply checksummed transactional
+migrations, then start Uvicorn. Without the variable, memory storage remains the default.
+`GET /agent/runs?limit=20&offset=0` returns newest-first completed records;
+`GET /agent/runs/{uuid}` retrieves one record. History is local and unauthenticated at
+this stage: bind only to localhost. Failed attempts are not yet stored.
+
+For real integration tests, set `TEST_DATABASE_URL` to a disposable PostgreSQL database
+and run the verification script. Tests mutate the migration checksum temporarily, so
+never point this at shared or production data. Pool transactions follow the
+[psycopg transaction contract](https://www.psycopg.org/psycopg3/docs/advanced/pool.html).
