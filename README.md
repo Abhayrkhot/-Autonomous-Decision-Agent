@@ -215,3 +215,18 @@ For real integration tests, set `TEST_DATABASE_URL` to a disposable PostgreSQL d
 and run the verification script. Tests mutate the migration checksum temporarily, so
 never point this at shared or production data. Pool transactions follow the
 [psycopg transaction contract](https://www.psycopg.org/psycopg3/docs/advanced/pool.html).
+
+### Stage 3: optional model-backed generation
+
+Default mode is deterministic. Set `AGENT_MODE=openai`, `OPENAI_API_KEY`, and
+`OPENAI_MODEL` explicitly to enable the Responses API adapter. It uses structured
+output, validates output locally, limits concurrency to four calls, limits output
+tokens to 1,500, and bounds retries to three attempts within a 30-second deadline.
+No tools are exposed to the model. Unsupported citations and invalid outputs fail
+with HTTP 502. Provider output is not treated as proof of factuality or safety.
+Token usage, model and prompt version are recorded; cost remains null.
+
+Contract source: [OpenAI structured outputs](https://developers.openai.com/api/docs/guides/structured-outputs).
+Normal tests simulate the HTTP provider. The real paid smoke is opt-in:
+`RUN_LIVE_PROVIDER_TEST=1 python -m pytest tests/test_provider.py -m live`.
+No live-provider success is claimed without that test and configured credentials.

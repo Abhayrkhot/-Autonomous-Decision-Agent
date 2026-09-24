@@ -71,3 +71,5 @@ class AgentResponse(Model):
     retrieved_context: list[RetrievedDocument]
     tool_results: list[ToolResult]
     evaluation: Evaluation
+    generation: dict[str, str | int | float | None] | None = None
+    citations: list[str] = Field(default_factory=list)

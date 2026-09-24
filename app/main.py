@@ -10,10 +10,13 @@ from app.agent import DecisionAgent
 from app.guardrails import GuardrailViolation
 from app.models import AgentRequest, AgentResponse
 from app.postgres import PostgresRunStore
+from app.provider import DecisionProvider, OpenAIProvider, ProviderError
 from app.storage import InMemoryRunStore, RunRecord, RunStore
 
 
-def create_app(store: RunStore | None = None) -> FastAPI:
+def create_app(
+    store: RunStore | None = None, provider: DecisionProvider | None = None
+) -> FastAPI:
     selected = (
         store
         if store is not None
@@ -37,7 +40,15 @@ def create_app(store: RunStore | None = None) -> FastAPI:
     application = FastAPI(
         title="Autonomous Decision Agent", version="0.2.0", lifespan=lifespan
     )
-    agent = DecisionAgent(selected)
+    configured_provider = provider
+    if (
+        os.getenv("AGENT_MODE", "deterministic") == "openai"
+        and configured_provider is None
+    ):
+        configured_provider = OpenAIProvider(
+            os.environ.get("OPENAI_API_KEY", ""), os.environ.get("OPENAI_MODEL", "")
+        )
+    agent = DecisionAgent(selected, provider=configured_provider)
 
     @application.get("/agent/runs", response_model=list[RunRecord])
     async def list_runs(
@@ -60,6 +71,8 @@ def create_app(store: RunStore | None = None) -> FastAPI:
     async def run_agent(request: AgentRequest) -> AgentResponse:
         try:
             return await agent.run(request)
+        except ProviderError as exc:
+            raise HTTPException(502, str(exc)) from exc
         except GuardrailViolation as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
 
