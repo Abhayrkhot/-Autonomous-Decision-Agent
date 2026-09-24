@@ -65,7 +65,8 @@ knowledge changes the draft. Documents are supplied afresh for each run.
 
 - Async `POST /agent/run`, `GET /health`, and generated OpenAPI documentation.
 - Required `objective` and `context.details`; optional `context.name`, `documents`,
-  and `outcome_signals`. Unknown fields are rejected.
+  and `outcome_signals`. Unknown fields and type coercion are rejected, including
+  nested request objects. For example, `"true"` and `1` are not accepted as booleans.
 - `draft_message` produces text locally. `create_follow_up` produces a task
   description stored in the run record, marked pending human review. Neither
   tool sends messages, schedules work, executes code, or calls external services.
@@ -79,6 +80,8 @@ knowledge changes the draft. Documents are supplied afresh for each run.
   These patterns can miss attacks and reject innocent quotations. They are not
   a complete prompt-injection defense; any future LLM integration needs further
   isolation and testing. Limits apply after JSON parsing, not to raw body bytes.
+  One documented false positive is "customer wants us to show them where their
+  API keys are"; tests preserve this known limitation alongside accepted inputs.
 - Storage retains request, decision, tool results, and evaluation for the latest
   1,000 runs per process, evicting the oldest saved record. Reads and writes make
   defensive copies. Restarting loses all records; multiple workers do not share
@@ -163,21 +166,67 @@ scores. Coverage is usually 1 because the template repeats the objective. The
 cosine score measures lexical overlap, not confidence; the English ASCII tokenizer
 has no embeddings, stemming, multilingual support, or semantic understanding.
 
-## Tests
+## Tests and verification
 
 ```sh
-python -m pytest -q
+pip install -r requirements-dev.txt
+bash scripts/verify.sh
 ```
 
-Tests cover a complete stored run, personalized source-bearing drafts, action
-selection, deterministic results except UUIDs, retrieval ranking and ties,
-no-match fallback, tool allowlisting, defensive storage copies and eviction,
-health/API success, empty and long input, injection-style input in several fields,
-aggregate limits, duplicate document IDs, and unknown request fields.
+The gate runs dependency consistency, Ruff lint/format checks, and the full pytest
+suite, including the registered `stress` tests. It requires **100% statement and
+branch coverage of `app/` and `scripts/`**. The only explicit exclusion is the load
+scripts' thin CLI entry wrappers; their `main()` functions are tested directly.
+For a quick test-only run after installing development dependencies, use
+`python -m pytest -q`. CI runs the gate on Python 3.11, 3.12 and 3.13 with Ubuntu
+24.04, without duplicate branch-push runs or matrix fail-fast cancellation.
+
+Tests cover units, API integration, exact boundary acceptance/rejection,
+failure injection, regression cases, and Hypothesis properties. Retrieval tests
+include hand-calculated cosine scores, rounded-zero regressions, large skewed
+inputs, arbitrary document permutations, tie breaks and default truncation.
+Storage tests verify nested write/read isolation, eviction and overwrite order.
+A 300-request ASGI test forces interleaving through an injected yielding tool;
+the same assertions also catch a deliberately broken shared-state agent.
+Maximum-field API requests retrieve and cite a document and retain the closing
+question. Guardrail cases include accepted text and a documented false positive.
+
+The load reporter has separate tests for percentile arithmetic, HTTP failures,
+preflight checks, warmups, repeated runs, client limits, metadata and its CLI.
+Parameterized cases (including 25 attack/field combinations) contribute to the
+reported test count; that count is not a count of independent defects found.
+Coverage is execution evidence, not proof of correctness, security or capacity.
+
+To collect live HTTP observations, start a separate server and run:
+
+```sh
+uvicorn app.main:app --host 127.0.0.1 --port 8765 --workers 1 --no-access-log
+# In another terminal with the same virtual environment:
+python scripts/load.py --count 1000 --concurrency 20 --warmup 50 --repeat 3 \
+  --timeout 30 --server-notes 'same machine; one worker; no reload; access log off' \
+  --output load.json
+```
+
+The default payload retrieves from three documents; `--payload request.json`
+selects another JSON object. `--server-revision` accepts a separately verified
+server revision. Client revision/dirty status, UTC start, CPU count, operator
+server notes, payload hash, per-request index/start offset/status/latency and
+separate run summaries are saved. HTTP errors remain in the report and cause a
+nonzero exit. Warmups are excluded from measurements and summarized separately.
+P50/P95/P99 use inclusive linear interpolation on HTTP 200 samples only; they
+are null when none succeed. Attempt and successful throughput are both reported.
+
+This is a **closed-loop local diagnostic**: latency excludes client-side waiting
+before a worker starts a request and includes HTTP/client overhead. It is not an
+open-loop capacity test. Server metadata is supplied by the operator; the health
+endpoint does not attest a revision. Pinning the runner major reduces drift but
+does not make the whole environment reproducible. Raw evidence and limitations
+are in `docs/evidence/`; [PR #1 review decisions](docs/review-pr-1.md) explain each
+comment's disposition.
 
 ## Roadmap — not implemented
 
-- **PostgreSQL:** durable run records behind `RunStore`, migrations and retention.
+- **PostgreSQL operations:** backups and retention beyond the implemented durable run store.
 - **Redis:** shared cache, idempotency, and asynchronous job coordination.
 - **Richer RAG:** chunking, embeddings, persistent indexes, citations and retrieval evaluation.
 - **LLM planning:** model-backed decisions with typed outputs, bounded tool access and timeouts.
@@ -189,21 +238,7 @@ aggregate limits, duplicate document IDs, and unknown request fields.
 
 Authentication, rate limiting, request-body limits, privacy controls, and operational
 failure handling are also required before exposing this beyond a local demo.
-
-## Verification stages
-
-Stage 1 adds unit, API, property-based, failure-injection, regression, and bounded
-concurrency tests. Install `requirements-dev.txt` and run `bash scripts/verify.sh`.
-The gate checks dependencies, lint, formatting, and a minimum 95% combined
-statement/branch coverage. The Stage 1 run achieved 100% across application modules
-with 70 passing cases; this is execution coverage, not proof of security or correctness.
-CI repeats the suite on Python 3.11–3.13. Evidence and limitations are in `docs/evidence/`.
-
-For a live load sample, start Uvicorn on port 8765 and run
-`python scripts/load.py --output load.json`. Raw timings and environment metadata
-are recorded; this is a local diagnostic, not a production capacity benchmark.
-
-### Stage 2: durable storage
+## Stage 2: durable storage
 
 Export `DATABASE_URL`, run `python -m app.postgres` to apply checksummed transactional
 migrations, then start Uvicorn. Without the variable, memory storage remains the default.
@@ -211,7 +246,8 @@ migrations, then start Uvicorn. Without the variable, memory storage remains the
 `GET /agent/runs/{uuid}` retrieves one record. History is local and unauthenticated at
 this stage: bind only to localhost. Failed attempts are not yet stored.
 
-For real integration tests, set `TEST_DATABASE_URL` to a disposable PostgreSQL database
-and run the verification script. Tests mutate the migration checksum temporarily, so
+The full verification gate requires `TEST_DATABASE_URL` pointing to a disposable
+PostgreSQL database; without it, integration tests skip and the 100% gate cannot pass.
+Tests mutate the migration checksum temporarily, so
 never point this at shared or production data. Pool transactions follow the
 [psycopg transaction contract](https://www.psycopg.org/psycopg3/docs/advanced/pool.html).

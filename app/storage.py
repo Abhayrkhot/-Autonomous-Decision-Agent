@@ -7,10 +7,10 @@ from uuid import UUID
 
 from pydantic import Field
 
-from app.models import AgentRequest, AgentResponse, Model
+from app.models import AgentRequest, AgentResponse, ResponseModel
 
 
-class RunRecord(Model):
+class RunRecord(ResponseModel):
     owner_id: str = "local"
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     status: Literal["completed"] = "completed"
@@ -27,6 +27,8 @@ class RunStore(Protocol):
 
 
 class InMemoryRunStore:
+    """Evict the oldest saved record; overwriting refreshes its eviction order."""
+
     def __init__(self, capacity: int = 1000) -> None:
         if capacity < 1:
             raise ValueError("Capacity must be positive")

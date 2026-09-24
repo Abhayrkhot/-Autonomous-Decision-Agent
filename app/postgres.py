@@ -66,8 +66,9 @@ class PostgresRunStore:
                 ),
             )
 
-            if cursor.rowcount != 1:
-                raise ValueError("Run owner cannot change")
+            if cursor.rowcount == 1:
+                return
+            raise ValueError("Run owner cannot change")
 
     async def get(self, run_id: UUID, owner_id: str = "local") -> RunRecord | None:
         async with self.pool.connection() as connection:
@@ -90,5 +91,10 @@ class PostgresRunStore:
             return [RunRecord.model_validate(row[0]) for row in await cursor.fetchall()]
 
 
-if __name__ == "__main__":
+def main() -> None:
+    """Apply migrations to the explicitly configured database."""
     asyncio.run(migrate(os.environ["DATABASE_URL"]))
+
+
+if __name__ == "__main__":  # pragma: no cover -- thin wrapper; main is tested directly.
+    main()

@@ -11,9 +11,12 @@ from app.guardrails import GuardrailViolation
 from app.models import AgentRequest, AgentResponse
 from app.postgres import PostgresRunStore
 from app.storage import InMemoryRunStore, RunRecord, RunStore
+from app.tools import ToolRegistry
 
 
-def create_app(store: RunStore | None = None) -> FastAPI:
+def create_app(
+    store: RunStore | None = None, registry: ToolRegistry | None = None
+) -> FastAPI:
     selected = (
         store
         if store is not None
@@ -37,7 +40,7 @@ def create_app(store: RunStore | None = None) -> FastAPI:
     application = FastAPI(
         title="Autonomous Decision Agent", version="0.2.0", lifespan=lifespan
     )
-    agent = DecisionAgent(selected)
+    agent = DecisionAgent(selected, registry=registry)
 
     @application.get("/agent/runs", response_model=list[RunRecord])
     async def list_runs(
