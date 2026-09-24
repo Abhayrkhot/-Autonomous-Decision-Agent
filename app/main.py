@@ -1,21 +1,59 @@
 """Run locally with uvicorn app.main:app --reload."""
 
-from fastapi import FastAPI, HTTPException
+import os
+from contextlib import asynccontextmanager
+from uuid import UUID
+
+from fastapi import FastAPI, HTTPException, Query
 
 from app.agent import DecisionAgent
 from app.guardrails import GuardrailViolation
 from app.models import AgentRequest, AgentResponse
-from app.storage import InMemoryRunStore, RunStore
+from app.postgres import PostgresRunStore
+from app.storage import InMemoryRunStore, RunRecord, RunStore
 from app.tools import ToolRegistry
 
 
 def create_app(
     store: RunStore | None = None, registry: ToolRegistry | None = None
 ) -> FastAPI:
-    application = FastAPI(title="Autonomous Decision Agent", version="0.1.0")
-    agent = DecisionAgent(
-        store if store is not None else InMemoryRunStore(), registry=registry
+    selected = (
+        store
+        if store is not None
+        else (
+            PostgresRunStore(os.environ["DATABASE_URL"])
+            if os.getenv("DATABASE_URL")
+            else InMemoryRunStore()
+        )
     )
+
+    @asynccontextmanager
+    async def lifespan(application: FastAPI):
+        if isinstance(selected, PostgresRunStore):
+            await selected.open()
+        try:
+            yield
+        finally:
+            if isinstance(selected, PostgresRunStore):
+                await selected.close()
+
+    application = FastAPI(
+        title="Autonomous Decision Agent", version="0.2.0", lifespan=lifespan
+    )
+    agent = DecisionAgent(selected, registry=registry)
+
+    @application.get("/agent/runs", response_model=list[RunRecord])
+    async def list_runs(
+        limit: int = Query(20, ge=1, le=100), offset: int = Query(0, ge=0)
+    ):
+        return await selected.list(limit=limit, offset=offset)
+
+    @application.get("/agent/runs/{run_id}", response_model=RunRecord)
+    async def get_run(run_id: UUID):
+        record = await selected.get(run_id)
+        if record is None:
+            raise HTTPException(404, "Run not found")
+        return record
 
     @application.get("/health")
     async def health() -> dict[str, str]:
