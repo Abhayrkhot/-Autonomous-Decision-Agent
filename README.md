@@ -245,3 +245,24 @@ Chunking adds useful source coverage and persistence, not demonstrated semantic
 quality gains. Multilingual semantic retrieval and large-scale vector indexing
 remain future work. Re-ingest original documents to rebuild the index. The original
 source must be retained by the caller; only chunks are stored here.
+
+### Stage 5: access control and reviewed actions
+
+`API_TOKENS_JSON` maps strong bearer tokens (24+ characters) to objects containing
+`owner_id`, `actor`, and `role` (`user` or `reviewer`). Configure this outside git.
+Authenticated history and knowledge access are scoped to owner. With no tokens,
+the app remains a local demo identity without reviewer privileges.
+
+Create an immutable proposal with `POST /agent/runs/{id}/actions`, inspect it with
+`GET /actions/{id}`, then a reviewer posts `{"digest":"...","decision":"approve"}`
+to `/actions/{id}/approval`. Approval expires after one hour and binds the exact
+payload digest. Rejection is also supported. `POST /actions/{id}/deliver` sends
+only an approved proposal to the operator-configured HTTPS `ACTION_WEBHOOK_URL`.
+No request or model output can choose the destination. Redirects are disabled.
+
+Database row locks prevent concurrent duplicate transitions; an idempotency key is
+sent to the receiver. Timeout/non-2xx results become `unknown` and are not retried.
+A crash during delivery can leave `dispatching`; manual reconciliation is required.
+This is conservative at-most-one application dispatch, not exactly-once delivery.
+Tests use a sandbox HTTP transport; no real customer message was sent. Static tokens
+are a small deployment seam, not a replacement for a managed identity provider.
