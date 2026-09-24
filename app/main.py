@@ -8,7 +8,8 @@ from fastapi import FastAPI, HTTPException, Query
 
 from app.agent import DecisionAgent
 from app.guardrails import GuardrailViolation
-from app.models import AgentRequest, AgentResponse
+from app.knowledge import PostgresKnowledge
+from app.models import AgentRequest, AgentResponse, Document
 from app.postgres import PostgresRunStore
 from app.provider import DecisionProvider, OpenAIProvider, ProviderError
 from app.storage import InMemoryRunStore, RunRecord, RunStore
@@ -48,7 +49,20 @@ def create_app(
         configured_provider = OpenAIProvider(
             os.environ.get("OPENAI_API_KEY", ""), os.environ.get("OPENAI_MODEL", "")
         )
-    agent = DecisionAgent(selected, provider=configured_provider)
+    knowledge = (
+        PostgresKnowledge(selected) if isinstance(selected, PostgresRunStore) else None
+    )
+    agent = DecisionAgent(selected, provider=configured_provider, knowledge=knowledge)
+
+    @application.post("/knowledge/documents")
+    async def ingest_document(document: Document):
+        if knowledge is None:
+            raise HTTPException(503, "Persistent knowledge requires DATABASE_URL")
+        try:
+            count = await knowledge.ingest("local", document)
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from exc
+        return {"document_id": document.id, "chunks": count}
 
     @application.get("/agent/runs", response_model=list[RunRecord])
     async def list_runs(

@@ -230,3 +230,18 @@ Contract source: [OpenAI structured outputs](https://developers.openai.com/api/d
 Normal tests simulate the HTTP provider. The real paid smoke is opt-in:
 `RUN_LIVE_PROVIDER_TEST=1 python -m pytest tests/test_provider.py -m live`.
 No live-provider success is claimed without that test and configured credentials.
+
+### Stage 4: persistent chunk retrieval
+
+With PostgreSQL configured and migrations applied, `POST /knowledge/documents`
+accepts `{"id":"guide","text":"..."}` and atomically replaces that source's chunks.
+Runs search both attached documents and stored chunks. Citations identify source
+and chunk; offsets identify exact original text. The corpus is capped at 1,000 chunks
+per owner and ingestion is serialized per owner for consistent limits.
+
+The local 256-dimensional hash embeddings encode lexical counts, **not semantic
+meaning**. Search uses a bounded exact scan with a lexical-intersection check.
+Chunking adds useful source coverage and persistence, not demonstrated semantic
+quality gains. Multilingual semantic retrieval and large-scale vector indexing
+remain future work. Re-ingest original documents to rebuild the index. The original
+source must be retained by the caller; only chunks are stored here.

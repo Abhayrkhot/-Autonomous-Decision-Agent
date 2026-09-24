@@ -45,6 +45,9 @@ class AgentRequest(Model):
 
 
 class RetrievedDocument(Model):
+    source_id: str | None = None
+    start_offset: int | None = None
+    end_offset: int | None = None
     document_id: str
     excerpt: str
     score: float = Field(ge=0, le=1)

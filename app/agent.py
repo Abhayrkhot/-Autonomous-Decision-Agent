@@ -4,6 +4,7 @@ from uuid import uuid4
 
 from app.evaluator import evaluate
 from app.guardrails import validate_request
+from app.knowledge import KnowledgeStore
 from app.models import AgentRequest, AgentResponse, ToolResult
 from app.planner import make_plan
 from app.provider import DecisionProvider
@@ -18,17 +19,28 @@ class DecisionAgent:
         store: RunStore,
         registry: ToolRegistry | None = None,
         provider: DecisionProvider | None = None,
+        knowledge: KnowledgeStore | None = None,
     ) -> None:
+        self.knowledge = knowledge
         self.provider = provider
         self.store = store
         self.registry = registry or default_registry()
 
-    async def run(self, request: AgentRequest) -> AgentResponse:
+    async def run(
+        self, request: AgentRequest, owner_id: str = "local"
+    ) -> AgentResponse:
         validate_request(request)
         plan, action = make_plan(request)
         retrieved = retrieve(
             f"{request.objective} {request.context.details}", request.documents
         )
+        if self.knowledge:
+            persistent = await self.knowledge.search(
+                owner_id, f"{request.objective} {request.context.details}"
+            )
+            retrieved = sorted(
+                retrieved + persistent, key=lambda item: (-item.score, item.document_id)
+            )[:3]
         metadata = None
         citations = [item.document_id for item in retrieved[:1]]
         if self.provider:
@@ -54,5 +66,7 @@ class DecisionAgent:
             citations=citations,
             evaluation=evaluate(request.objective, draft.output, retrieved),
         )
-        await self.store.save(RunRecord(request=request, response=response))
+        await self.store.save(
+            RunRecord(owner_id=owner_id, request=request, response=response)
+        )
         return response

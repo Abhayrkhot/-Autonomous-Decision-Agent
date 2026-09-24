@@ -1,0 +1,5 @@
+[
+  {"query":"onboarding setup", "documents":[{"id":"guide","text":"onboarding setup guide"},{"id":"garden","text":"soil flower care"}], "expected":"guide"},
+  {"query":"billing invoice", "documents":[{"id":"billing","text":"billing invoice payment"},{"id":"setup","text":"onboarding setup"}], "expected":"billing"},
+  {"query":"unknown", "documents":[{"id":"guide","text":"onboarding guide"}], "expected":null}
+]
