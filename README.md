@@ -3,7 +3,8 @@
 A small Python 3.11+ / FastAPI project that turns a business objective, customer
 context, optional knowledge documents, and outcome signals into a recommended
 action and a personalized message draft. It retrieves relevant context, runs two
-local tools, evaluates the result, and stores the completed decision in memory.
+local tools, evaluates the result, and stores the completed decision in memory
+or an optional PostgreSQL database.
 
 ## Why this exists
 
@@ -85,7 +86,8 @@ knowledge changes the draft. Documents are supplied afresh for each run.
 - Storage retains request, decision, tool results, and evaluation for the latest
   1,000 runs per process, evicting the oldest saved record. Reads and writes make
   defensive copies. Restarting loses all records; multiple workers do not share
-  state. There is no public history endpoint, queue, retry policy, or persistence.
+  state. The optional PostgreSQL adapter adds durable storage and paginated history
+  (see Stage 2 below). There is no queue or retry policy at this stage.
 - Async interfaces prepare for future I/O adapters; the local CPU work is small
   and synchronous. There is no background worker or distributed processing.
 - No authentication, production hardening, benchmark, deployment, or measured
@@ -175,8 +177,8 @@ bash scripts/verify.sh
 
 The gate runs dependency consistency, Ruff lint/format checks, and the full pytest
 suite, including the registered `stress` tests. It requires **100% statement and
-branch coverage of `app/` and `scripts/`**. The only explicit exclusion is the load
-scripts' thin CLI entry wrappers; their `main()` functions are tested directly.
+branch coverage of `app/` and `scripts/`**. The only explicit exclusions are the load
+and migration commands' thin entry wrappers; their `main()` functions are tested directly.
 For a quick test-only run after installing development dependencies, use
 `python -m pytest -q`. CI runs the gate on Python 3.11, 3.12 and 3.13 with Ubuntu
 24.04, without duplicate branch-push runs or matrix fail-fast cancellation.
