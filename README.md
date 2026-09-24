@@ -286,3 +286,17 @@ Execution is at-least-once after a crash; model calls may repeat and incur charg
 Only a current lease can commit one result. Cancellation does not immediately stop
 an already-running external model call. Run real job tests with both
 `TEST_DATABASE_URL` and `TEST_REDIS_URL` set to disposable services.
+
+### Stage 7: evaluation and observed feedback
+
+Run `python -m app.evaluation_suite --output evaluation.json` for seven versioned
+synthetic behavior cases. `--baseline previous.json` compares every metric per case
+on the identical dataset hash; an aggregate score cannot hide a regression. These
+check decisions, retrieval, citations, tools, and structure, not semantic truth.
+
+PostgreSQL-backed endpoints accept reviewer-only `POST /agent/runs/{id}/reviews`,
+observed `POST /agent/runs/{id}/outcomes`, and `GET /agent/runs/{id}/evaluation`.
+Reviews and outcome events reject conflicting duplicates. Missing data returns null,
+not zero. Reports read at most 1,000 reviews and 1,000 outcomes per run. See
+`docs/human-evaluation.md` for the rubric and limits. No real human-review campaign,
+automatic learning, causal uplift, or model-quality improvement is claimed.

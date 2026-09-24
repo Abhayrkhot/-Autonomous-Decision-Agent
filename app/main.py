@@ -9,6 +9,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Query
 from app.actions import Action, ActionError, ActionService, Approval
 from app.agent import DecisionAgent
 from app.auth import Principal, auth_dependency
+from app.feedback import FeedbackError, FeedbackService, HumanReview, Outcome
 from app.guardrails import GuardrailViolation
 from app.jobs import JobError, JobService, JobStatus, QueueFull
 from app.knowledge import PostgresKnowledge
@@ -185,6 +186,39 @@ def create_app(
     @application.post("/agent/jobs/{job_id}/cancel", response_model=JobStatus)
     async def cancel_job(job_id: UUID, principal: Principal = Depends(authenticate)):
         return await job_service().cancel(job_id, principal.owner_id)
+
+    feedback = (
+        FeedbackService(selected) if isinstance(selected, PostgresRunStore) else None
+    )
+
+    def feedback_service() -> FeedbackService:
+        if feedback is None:
+            raise HTTPException(503, "Feedback requires PostgreSQL")
+        return feedback
+
+    @application.exception_handler(FeedbackError)
+    async def feedback_error(request, exc):
+        from fastapi.responses import JSONResponse
+
+        return JSONResponse(status_code=409, content={"detail": str(exc)})
+
+    @application.post("/agent/runs/{run_id}/reviews", response_model=HumanReview)
+    async def review_run(
+        run_id: UUID, review: HumanReview, principal: Principal = Depends(authenticate)
+    ):
+        return await feedback_service().review(run_id, review, principal)
+
+    @application.post("/agent/runs/{run_id}/outcomes", response_model=Outcome)
+    async def record_outcome(
+        run_id: UUID, outcome: Outcome, principal: Principal = Depends(authenticate)
+    ):
+        return await feedback_service().outcome(run_id, outcome, principal)
+
+    @application.get("/agent/runs/{run_id}/evaluation")
+    async def run_evaluation(
+        run_id: UUID, principal: Principal = Depends(authenticate)
+    ):
+        return await feedback_service().report(run_id, principal)
 
     return application
 
