@@ -6,11 +6,16 @@ from app.agent import DecisionAgent
 from app.guardrails import GuardrailViolation
 from app.models import AgentRequest, AgentResponse
 from app.storage import InMemoryRunStore, RunStore
+from app.tools import ToolRegistry
 
 
-def create_app(store: RunStore | None = None) -> FastAPI:
+def create_app(
+    store: RunStore | None = None, registry: ToolRegistry | None = None
+) -> FastAPI:
     application = FastAPI(title="Autonomous Decision Agent", version="0.1.0")
-    agent = DecisionAgent(store if store is not None else InMemoryRunStore())
+    agent = DecisionAgent(
+        store if store is not None else InMemoryRunStore(), registry=registry
+    )
 
     @application.get("/health")
     async def health() -> dict[str, str]:

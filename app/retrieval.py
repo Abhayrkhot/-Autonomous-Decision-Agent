@@ -20,6 +20,8 @@ def tokens(text: str) -> list[str]:
 def retrieve(
     query: str, documents: list[Document], limit: int = 3
 ) -> list[RetrievedDocument]:
+    if type(limit) is not int or limit < 0:
+        raise ValueError("Retrieval limit must be a nonnegative integer")
     query_counts = Counter(tokens(query))
     matches: list[RetrievedDocument] = []
     for document in documents:
@@ -29,13 +31,14 @@ def retrieve(
             sum(v * v for v in query_counts.values())
             * sum(v * v for v in counts.values())
         )
-        score = min(1.0, dot / norm) if norm else 0.0
+        # Filter the value exposed to callers, including the rounding boundary.
+        score = round(min(1.0, dot / norm), 6) if norm else 0.0
         if score > 0:
             matches.append(
                 RetrievedDocument(
                     document_id=document.id,
                     excerpt=document.text[:500],
-                    score=round(score, 6),
+                    score=score,
                 )
             )
     return sorted(matches, key=lambda item: (-item.score, item.document_id))[:limit]
