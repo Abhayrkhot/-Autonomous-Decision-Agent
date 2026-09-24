@@ -4,12 +4,13 @@ import os
 from contextlib import asynccontextmanager
 from uuid import UUID
 
-from fastapi import Depends, FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, Header, HTTPException, Query
 
 from app.actions import Action, ActionError, ActionService, Approval
 from app.agent import DecisionAgent
 from app.auth import Principal, auth_dependency
 from app.guardrails import GuardrailViolation
+from app.jobs import JobError, JobService, JobStatus, QueueFull
 from app.knowledge import PostgresKnowledge
 from app.models import AgentRequest, AgentResponse, Document
 from app.postgres import PostgresRunStore
@@ -30,6 +31,12 @@ def create_app(
         )
     )
 
+    jobs = (
+        JobService(selected, os.getenv("REDIS_URL"))
+        if isinstance(selected, PostgresRunStore)
+        else None
+    )
+
     @asynccontextmanager
     async def lifespan(application: FastAPI):
         if isinstance(selected, PostgresRunStore):
@@ -37,6 +44,8 @@ def create_app(
         try:
             yield
         finally:
+            if jobs:
+                await jobs.close()
             if isinstance(selected, PostgresRunStore):
                 await selected.close()
 
@@ -141,6 +150,41 @@ def create_app(
         action_id: UUID, principal: Principal = Depends(authenticate)
     ):
         return await action_service().deliver(action_id, principal)
+
+    def job_service() -> JobService:
+        if jobs is None:
+            raise HTTPException(503, "Jobs require PostgreSQL")
+        return jobs
+
+    @application.exception_handler(JobError)
+    async def job_error(request, exc):
+        from fastapi.responses import JSONResponse
+
+        return JSONResponse(
+            status_code=429 if isinstance(exc, QueueFull) else 409,
+            content={"detail": str(exc)},
+        )
+
+    @application.post("/agent/jobs", response_model=JobStatus, status_code=202)
+    async def submit_job(
+        request: AgentRequest,
+        principal: Principal = Depends(authenticate),
+        idempotency_key: str = Header(min_length=1, max_length=200),
+    ):
+        try:
+            return await job_service().submit(
+                request, principal.owner_id, idempotency_key
+            )
+        except GuardrailViolation as exc:
+            raise HTTPException(422, str(exc)) from exc
+
+    @application.get("/agent/jobs/{job_id}", response_model=JobStatus)
+    async def get_job(job_id: UUID, principal: Principal = Depends(authenticate)):
+        return await job_service().get(job_id, principal.owner_id)
+
+    @application.post("/agent/jobs/{job_id}/cancel", response_model=JobStatus)
+    async def cancel_job(job_id: UUID, principal: Principal = Depends(authenticate)):
+        return await job_service().cancel(job_id, principal.owner_id)
 
     return application
 
