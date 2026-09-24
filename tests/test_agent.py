@@ -1,83 +1,89 @@
-import asyncio
-
 import pytest
 
 from app.agent import DecisionAgent
-from app.models import AgentRequest, Document
-from app.retrieval import retrieve
 from app.storage import InMemoryRunStore
-from app.tools import ToolInput, default_registry
+from app.tools import ToolInput, ToolRegistry, default_registry
+from tests.helpers import make_request
+
+pytestmark = pytest.mark.anyio
 
 
-def request(**overrides):
-    return AgentRequest.model_validate(
-        {
-            "objective": "Improve onboarding",
-            "context": {"name": "Sam", "details": "Needs onboarding assistance"},
-            **overrides,
-        }
-    )
-
-
-def test_complete_run_and_storage_isolation():
-    async def scenario():
-        store = InMemoryRunStore(capacity=1)
-        agent = DecisionAgent(store)
-        first = await agent.run(
-            request(
-                documents=[{"id": "guide", "text": "Onboarding assistance guide"}],
-                outcome_signals={"engagement": "low"},
-            )
-        )
-        assert first.retrieved_context[0].document_id == "guide"
-        assert "Supporting reference [guide]" in first.message
-        assert first.recommended_action.startswith("Offer assistance")
-        assert first.evaluation.objective_token_coverage == 1.0
-        assert [item.tool for item in first.tool_results] == [
-            "draft_message",
-            "create_follow_up",
-        ]
-        saved = await store.get(first.run_id)
-        assert saved.response == first
-        first.message = "changed"
-        assert (await store.get(first.run_id)).response.message != "changed"
-        second = await agent.run(request())
-        assert await store.get(first.run_id) is None
-        assert (await store.get(second.run_id)).response == second
-        assert "No relevant supporting document" in second.message
-
-    asyncio.run(scenario())
-
-
-def test_retrieval_ranking_ties_and_no_match():
-    docs = [
-        Document(id="b", text="onboarding"),
-        Document(id="a", text="onboarding"),
-        Document(id="c", text="gardening soil"),
+async def test_complete_run_is_persisted():
+    store = InMemoryRunStore()
+    request = make_request(documents=[{"id": "guide", "text": "alpha help"}])
+    result = await DecisionAgent(store).run(request)
+    saved = await store.get(result.run_id)
+    assert saved.request == request
+    assert saved.response == result
+    assert result.retrieved_context[0].document_id == "guide"
+    assert result.evaluation.objective_token_coverage == 1.0
+    assert [tool.tool for tool in result.tool_results] == [
+        "draft_message",
+        "create_follow_up",
     ]
-    assert [hit.document_id for hit in retrieve("onboarding", docs)] == ["a", "b"]
-    assert retrieve("unrelated", docs) == []
-    assert retrieve("the and", docs) == []
 
 
-def test_unknown_and_duplicate_tools_are_rejected():
-    async def scenario():
-        registry = default_registry()
-        with pytest.raises(ValueError, match="Unknown tool"):
-            await registry.execute("shell", ToolInput(request(), "help", []))
-        with pytest.raises(ValueError, match="already registered"):
-            registry.register("draft_message", lambda _: None)
-
-    asyncio.run(scenario())
+async def test_no_match_draft_reports_missing_evidence():
+    result = await DecisionAgent(InMemoryRunStore()).run(make_request())
+    assert result.retrieved_context == []
+    assert "No relevant supporting document" in result.message
 
 
-def test_results_are_deterministic_except_run_id():
-    async def scenario():
-        agent = DecisionAgent(InMemoryRunStore())
-        first, second = await agent.run(request()), await agent.run(request())
-        assert first.run_id != second.run_id
-        assert first.model_dump(exclude={"run_id"}) == second.model_dump(
-            exclude={"run_id"}
+async def test_results_are_deterministic_except_run_id():
+    agent = DecisionAgent(InMemoryRunStore())
+    first, second = await agent.run(make_request()), await agent.run(make_request())
+    assert first.model_dump(exclude={"run_id"}) == second.model_dump(exclude={"run_id"})
+
+
+async def test_unknown_tool_is_rejected():
+    with pytest.raises(ValueError, match="Unknown tool"):
+        await default_registry().execute(
+            "shell",
+            ToolInput(request=make_request(), action="help", retrieved=[]),
         )
 
-    asyncio.run(scenario())
+
+async def test_duplicate_tool_is_rejected():
+    async def unused(data):
+        return "unused"
+
+    with pytest.raises(ValueError, match="already registered"):
+        default_registry().register("draft_message", unused)
+
+
+async def test_tool_failure_does_not_save():
+    calls = []
+
+    class RecordingStore(InMemoryRunStore):
+        async def save(self, record):
+            calls.append(record)
+
+    async def failing(data):
+        raise RuntimeError("tool failed")
+
+    registry = ToolRegistry()
+    registry.register("draft_message", failing)
+    with pytest.raises(RuntimeError, match="tool failed"):
+        await DecisionAgent(RecordingStore(), registry).run(make_request())
+    assert calls == []
+
+
+async def test_retrieved_text_is_incorporated_in_draft():
+    agent = DecisionAgent(InMemoryRunStore())
+    first = await agent.run(
+        make_request(documents=[{"id": "same", "text": "alpha first"}])
+    )
+    second = await agent.run(
+        make_request(documents=[{"id": "same", "text": "alpha second"}])
+    )
+    assert "alpha first" in first.message
+    assert "alpha second" in second.message
+
+
+async def test_follow_up_is_a_local_review_task():
+    result = await default_registry().execute(
+        "create_follow_up",
+        ToolInput(request=make_request(), action="help", retrieved=[]),
+    )
+    assert result.tool == "create_follow_up"
+    assert result.output == "Pending human review: help for customer."

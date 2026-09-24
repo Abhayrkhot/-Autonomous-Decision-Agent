@@ -3,4 +3,4 @@ set -euo pipefail
 python -m pip check
 python -m ruff check app tests scripts
 python -m ruff format --check app tests scripts
-python -m pytest --cov=app --cov-branch --cov-report=term-missing --cov-report=xml "$@"
+python -m pytest --cov=app --cov=scripts --cov-branch --cov-report=term-missing --cov-report=xml "$@"

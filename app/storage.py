@@ -4,10 +4,10 @@ from collections import OrderedDict
 from typing import Protocol
 from uuid import UUID
 
-from app.models import AgentRequest, AgentResponse, Model
+from app.models import AgentRequest, AgentResponse, ResponseModel
 
 
-class RunRecord(Model):
+class RunRecord(ResponseModel):
     request: AgentRequest
     response: AgentResponse
 
@@ -18,6 +18,8 @@ class RunStore(Protocol):
 
 
 class InMemoryRunStore:
+    """Evict the oldest saved record; overwriting refreshes its eviction order."""
+
     def __init__(self, capacity: int = 1000) -> None:
         if capacity < 1:
             raise ValueError("Capacity must be positive")

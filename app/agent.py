@@ -22,7 +22,7 @@ class DecisionAgent:
         retrieved = retrieve(
             f"{request.objective} {request.context.details}", request.documents
         )
-        data = ToolInput(request, action, retrieved)
+        data = ToolInput(request=request, action=action, retrieved=retrieved)
         draft = await self.registry.execute("draft_message", data)
         follow_up = await self.registry.execute("create_follow_up", data)
         response = AgentResponse(
