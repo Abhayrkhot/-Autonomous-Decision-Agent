@@ -266,3 +266,23 @@ A crash during delivery can leave `dispatching`; manual reconciliation is requir
 This is conservative at-most-one application dispatch, not exactly-once delivery.
 Tests use a sandbox HTTP transport; no real customer message was sent. Static tokens
 are a small deployment seam, not a replacement for a managed identity provider.
+
+### Stage 6: background jobs
+
+Export `DATABASE_URL` and optionally `REDIS_URL`, apply migrations, then run
+`python -m app.worker` alongside the API. `POST /agent/jobs` accepts the same request
+and a required `Idempotency-Key` header, returning HTTP 202 and a job ID. Poll
+`GET /agent/jobs/{id}`; read the completed run using its `result_id`. Cancel with
+`POST /agent/jobs/{id}/cancel` (this fences saving, but cannot undo provider billing).
+
+PostgreSQL is authoritative; Redis holds bounded wakeup notifications only. Workers
+poll when notifications are lost. Row locks and lease tokens fence stale workers.
+A job gets at most three attempts, a 60-second lease, a 45-second execution deadline,
+and exponential retry delay. Result persistence and completion are one transaction.
+There are at most 100 outstanding jobs per owner. Workers generate drafts only;
+approved external actions are never automatically replayed by this queue.
+
+Execution is at-least-once after a crash; model calls may repeat and incur charges.
+Only a current lease can commit one result. Cancellation does not immediately stop
+an already-running external model call. Run real job tests with both
+`TEST_DATABASE_URL` and `TEST_REDIS_URL` set to disposable services.
