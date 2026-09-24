@@ -1,6 +1,7 @@
 import asyncio
 
 import pytest
+
 from app.agent import DecisionAgent
 from app.models import AgentRequest, Document
 from app.retrieval import retrieve

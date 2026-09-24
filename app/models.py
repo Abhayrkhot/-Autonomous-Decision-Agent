@@ -3,7 +3,7 @@
 from typing import Annotated, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, StringConstraints
 
 ShortText = Annotated[
     str, StringConstraints(strip_whitespace=True, min_length=1, max_length=2000)
@@ -34,7 +34,7 @@ class Document(Model):
 class OutcomeSignals(Model):
     # Observations influence the recommendation; they are not predicted outcomes.
     engagement: Literal["low", "medium", "high"] = "medium"
-    last_action_success: bool | None = None
+    last_action_success: StrictBool | None = None
 
 
 class AgentRequest(Model):

@@ -20,6 +20,8 @@ def tokens(text: str) -> list[str]:
 def retrieve(
     query: str, documents: list[Document], limit: int = 3
 ) -> list[RetrievedDocument]:
+    if limit < 0:
+        raise ValueError("Retrieval limit cannot be negative")
     query_counts = Counter(tokens(query))
     matches: list[RetrievedDocument] = []
     for document in documents:

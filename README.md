@@ -189,3 +189,16 @@ aggregate limits, duplicate document IDs, and unknown request fields.
 
 Authentication, rate limiting, request-body limits, privacy controls, and operational
 failure handling are also required before exposing this beyond a local demo.
+
+## Verification stages
+
+Stage 1 adds unit, API, property-based, failure-injection, regression, and bounded
+concurrency tests. Install `requirements-dev.txt` and run `bash scripts/verify.sh`.
+The gate checks dependencies, lint, formatting, and a minimum 95% combined
+statement/branch coverage. The Stage 1 run achieved 100% across application modules
+with 70 passing cases; this is execution coverage, not proof of security or correctness.
+CI repeats the suite on Python 3.11–3.13. Evidence and limitations are in `docs/evidence/`.
+
+For a live load sample, start Uvicorn on port 8765 and run
+`python scripts/load.py --output load.json`. Raw timings and environment metadata
+are recorded; this is a local diagnostic, not a production capacity benchmark.
