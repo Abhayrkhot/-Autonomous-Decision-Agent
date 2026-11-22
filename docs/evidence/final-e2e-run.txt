@@ -1,0 +1,68 @@
+[core] PASS health
+[core] PASS ready
+[core] PASS request id header
+[core] PASS missing token is 401
+[core] PASS unknown token is 401
+[core] PASS knowledge ingested in overlapping chunks
+[core] PASS sync run
+[core] PASS persistent retrieval with source offsets
+[core] PASS citations come from retrieved evidence
+[core] PASS deterministic action from outcome signals
+[core] PASS message cites the playbook
+[core] PASS history lists the run
+[core] PASS run is readable by its owner
+[core] PASS run is hidden from another owner
+[core] PASS knowledge is owner scoped
+[core] PASS guardrail rejects injection
+[core] PASS strict types rejected without echoing input
+[core] PASS oversized body is 413
+[core] PASS job accepted with 202
+[core] PASS idempotent resubmission
+[core] PASS idempotency key reuse with new body is 409
+[core] PASS worker completed the job
+[core] PASS job result stored as a run
+[core] PASS job hidden from another owner
+[core] PASS action proposed as pending
+[core] PASS user cannot approve
+[core] PASS action hidden from another owner
+[core] PASS digest mismatch rejected
+[core] PASS delivery before approval rejected
+[core] PASS reviewer approves
+[core] PASS approved action delivered over HTTPS
+[core] PASS second delivery rejected
+[core] PASS webhook received exactly one delivery
+[core] PASS delivery carries the idempotency key and approved payload
+[core] PASS audit trail in order
+[core] PASS reviewer can reject
+[core] PASS rejected action cannot be delivered
+[core] PASS webhook still has one delivery
+[core] PASS user cannot submit a review
+[core] PASS reviewer review recorded
+[core] PASS identical review replay is idempotent
+[core] PASS conflicting review rejected
+[core] PASS outcome recorded
+[core] PASS outcome replay is idempotent
+[core] PASS conflicting outcome rejected
+[core] PASS evaluation report aggregates feedback
+[core] PASS metrics need the reviewer role
+[core] PASS metrics count requests
+worker stop: exit 0 after 0.66s
+[queued] PASS job waits while no worker runs
+[queued] PASS queued job cancelled
+[drain] PASS job submitted while worker was down completes after restart
+[drain] PASS cancelled job is never executed
+[recovery] PASS API ready again after PostgreSQL restart without its own restart
+[recovery] PASS runs survive the database restart
+[recovery] PASS action state survives
+[recovery] PASS new runs work on fresh pool connections
+[model] PASS earlier run survives container recreation
+[model] PASS model-backed sync run
+[model] PASS draft comes from the model
+[model] PASS generation metadata recorded
+[model] PASS model citations are retrieved evidence
+[model] PASS provider outage maps to 502 after bounded retries
+[model] PASS worker uses the model too
+[model] PASS job run records generation metadata
+[model] PASS every model call authenticated with strict schema
+worker stop: exit 0 after 0.76s
+e2e: 67/67 checks passed

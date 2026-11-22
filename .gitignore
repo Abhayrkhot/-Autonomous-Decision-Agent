@@ -9,3 +9,5 @@ coverage.xml
 htmlcov/
 .hypothesis/
 .ruff_cache/
+
+e2e-out/

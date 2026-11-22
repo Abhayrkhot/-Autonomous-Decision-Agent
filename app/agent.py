@@ -4,26 +4,56 @@ from uuid import uuid4
 
 from app.evaluator import evaluate
 from app.guardrails import validate_request
-from app.models import AgentRequest, AgentResponse
+from app.knowledge import KnowledgeStore
+from app.models import AgentRequest, AgentResponse, ToolResult
 from app.planner import make_plan
+from app.provider import DecisionProvider
 from app.retrieval import retrieve
 from app.storage import RunRecord, RunStore
 from app.tools import ToolInput, ToolRegistry, default_registry
 
 
 class DecisionAgent:
-    def __init__(self, store: RunStore, registry: ToolRegistry | None = None) -> None:
+    def __init__(
+        self,
+        store: RunStore,
+        registry: ToolRegistry | None = None,
+        provider: DecisionProvider | None = None,
+        knowledge: KnowledgeStore | None = None,
+    ) -> None:
+        self.knowledge = knowledge
+        self.provider = provider
         self.store = store
         self.registry = registry or default_registry()
 
-    async def run(self, request: AgentRequest) -> AgentResponse:
+    async def run(
+        self, request: AgentRequest, owner_id: str = "local"
+    ) -> AgentResponse:
         validate_request(request)
         plan, action = make_plan(request)
         retrieved = retrieve(
             f"{request.objective} {request.context.details}", request.documents
         )
+        if self.knowledge:
+            persistent = await self.knowledge.search(
+                owner_id, f"{request.objective} {request.context.details}"
+            )
+            retrieved = sorted(
+                retrieved + persistent, key=lambda item: (-item.score, item.document_id)
+            )[:3]
+        metadata = None
+        citations = [item.document_id for item in retrieved[:1]]
+        if self.provider:
+            generated, metadata = await self.provider.generate(request, retrieved)
+            plan, action = generated.plan, generated.action
+            citations = generated.citations
+            draft = ToolResult(tool="model_draft", output=generated.message)
+        else:
+            draft = await self.registry.execute(
+                "draft_message",
+                ToolInput(request=request, action=action, retrieved=retrieved),
+            )
         data = ToolInput(request=request, action=action, retrieved=retrieved)
-        draft = await self.registry.execute("draft_message", data)
         follow_up = await self.registry.execute("create_follow_up", data)
         response = AgentResponse(
             run_id=uuid4(),
@@ -33,7 +63,11 @@ class DecisionAgent:
             message=draft.output,
             retrieved_context=retrieved,
             tool_results=[draft, follow_up],
+            generation=metadata.model_dump() if metadata else None,
+            citations=citations,
             evaluation=evaluate(request.objective, draft.output, retrieved),
         )
-        await self.store.save(RunRecord(request=request, response=response))
+        await self.store.save(
+            RunRecord(owner_id=owner_id, request=request, response=response)
+        )
         return response

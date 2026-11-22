@@ -1,0 +1,72 @@
+Python 3.13.18
+revision 94a5bf0459c96ecb1dca61190e3f1a0c75b801fe dirty=0
+No broken requirements found.
+All checks passed!
+44 files already formatted
+============================= test session starts ==============================
+platform linux -- Python 3.13.18, pytest-9.2.0, pluggy-1.7.0
+rootdir: /src
+configfile: pyproject.toml
+testpaths: tests
+plugins: hypothesis-6.170.17, cov-7.1.0, anyio-4.16.0, platformdirs-4.14.8
+collected 223 items
+
+tests/test_actions.py ...                                                [  1%]
+tests/test_agent.py ........                                             [  4%]
+tests/test_api.py ..........................                             [ 16%]
+tests/test_concurrency.py ..                                             [ 17%]
+tests/test_contracts.py ................................................ [ 39%]
+...............                                                          [ 45%]
+tests/test_evaluation_feedback.py .....                                  [ 47%]
+tests/test_evaluator.py ............                                     [ 53%]
+tests/test_jobs.py .......                                               [ 56%]
+tests/test_knowledge.py ......                                           [ 59%]
+tests/test_load.py ....................................                  [ 75%]
+tests/test_operations.py ...                                             [ 76%]
+tests/test_postgres_cli.py ...                                           [ 78%]
+tests/test_provider.py ..............s..                                 [ 85%]
+tests/test_retrieval.py ....................                             [ 94%]
+tests/test_storage.py ......                                             [ 97%]
+tests/test_storage_contract.py ......                                    [100%]
+
+=============================== warnings summary ===============================
+../usr/local/lib/python3.13/site-packages/fastapi/testclient.py:1
+  /usr/local/lib/python3.13/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+================================ tests coverage ================================
+_______________ coverage: platform linux, python 3.13.18-final-0 _______________
+
+Name                      Stmts   Miss Branch BrPart  Cover   Missing
+---------------------------------------------------------------------
+app/__init__.py               0      0      0      0   100%
+app/actions.py               86      0     18      0   100%
+app/agent.py                 36      0      4      0   100%
+app/auth.py                  25      0      8      0   100%
+app/errors.py                 8      0      4      0   100%
+app/evaluation_suite.py      52      0     24      0   100%
+app/evaluator.py              6      0      0      0   100%
+app/feedback.py              70      0     14      0   100%
+app/guardrails.py            17      0      8      0   100%
+app/jobs.py                 132      0     28      0   100%
+app/knowledge.py             57      0     14      0   100%
+app/main.py                 144      0     24      0   100%
+app/models.py                50      0      0      0   100%
+app/operations.py            65      0     18      0   100%
+app/planner.py                5      0      0      0   100%
+app/postgres.py              48      0      8      0   100%
+app/provider.py              85      0     20      0   100%
+app/retrieval.py             20      0      6      0   100%
+app/storage.py               38      0      8      0   100%
+app/tools.py                 37      0      6      0   100%
+app/worker.py                41      0      6      0   100%
+scripts/__init__.py           0      0      0      0   100%
+scripts/load.py             109      0     20      0   100%
+---------------------------------------------------------------------
+TOTAL                      1131      0    238      0   100%
+Coverage XML written to file coverage.xml
+Required test coverage of 100.0% reached. Total coverage: 100.00%
+=========================== short test summary info ============================
+SKIPPED [1] tests/test_provider.py:191: explicit paid smoke opt-in required
+================== 222 passed, 1 skipped, 1 warning in 9.85s ===================

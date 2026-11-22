@@ -51,6 +51,9 @@ class AgentRequest(RequestModel):
 
 
 class RetrievedDocument(ResponseModel):
+    source_id: str | None = None
+    start_offset: int | None = None
+    end_offset: int | None = None
     document_id: str
     excerpt: str
     score: float = Field(ge=0, le=1)
@@ -77,3 +80,5 @@ class AgentResponse(ResponseModel):
     retrieved_context: list[RetrievedDocument]
     tool_results: list[ToolResult]
     evaluation: Evaluation
+    generation: dict[str, str | int | float | None] | None = None
+    citations: list[str] = Field(default_factory=list)

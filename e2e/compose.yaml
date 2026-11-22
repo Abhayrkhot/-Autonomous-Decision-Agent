@@ -1,0 +1,41 @@
+# Overlay for e2e/run.sh: test-only webhook sink, Responses API stub and driver.
+x-e2e-image: &e2e-image
+  image: autonomous-decision-agent:local
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+services:
+  api:
+    environment:
+      SSL_CERT_FILE: /certs/ca.pem
+    volumes: ['${E2E_OUT:?run e2e/run.sh}/certs/ca.pem:/certs/ca.pem:ro']
+    depends_on:
+      webhook: {condition: service_healthy}
+      model-stub: {condition: service_healthy}
+  webhook:
+    <<: *e2e-image
+    command: [python, /e2e/stubs.py, webhook, --cert, /certs/webhook.pem, --key, /certs/webhook.key]
+    volumes: ['./e2e:/e2e:ro', '${E2E_OUT}/certs:/certs:ro']
+    healthcheck:
+      test: [CMD, python, -c, "import socket; socket.create_connection(('127.0.0.1', 8443), 2)"]
+      interval: 1s
+      retries: 30
+  model-stub:
+    <<: *e2e-image
+    command: [python, /e2e/stubs.py, model]
+    volumes: ['./e2e:/e2e:ro']
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=2)"]
+      interval: 1s
+      retries: 30
+  driver:
+    <<: *e2e-image
+    profiles: [e2e]
+    user: '${E2E_UID:-10001}:${E2E_GID:-10001}'
+    command: [python, /e2e/driver.py]
+    volumes: ['./e2e:/e2e:ro', '${E2E_OUT}:/out']
+    environment:
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@postgres:5432/agent
+      E2E_USER_TOKEN: ${E2E_USER_TOKEN}
+      E2E_REVIEWER_TOKEN: ${E2E_REVIEWER_TOKEN}
+      E2E_OTHER_TOKEN: ${E2E_OTHER_TOKEN}

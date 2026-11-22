@@ -1,0 +1,56 @@
+Tested revision: 82101b6dd5602909dd61e9261d8e9531fb435d9e
+Started UTC: 2026-09-24T16:19:38.658676+00:00
+Clean checkout: stage-sync-2-82101b6-clean
+
+No broken requirements found.
+All checks passed!
+26 files already formatted
+============================= test session starts ==============================
+platform darwin -- Python 3.11.9, pytest-8.3.5, pluggy-1.6.0
+rootdir: /Users/abhaykhot/Documents/Codex/2026-09-23/referenced-chatgpt-conversation-this-is-an/work/stage-sync-2-82101b6-clean
+configfile: pyproject.toml
+testpaths: tests
+plugins: hypothesis-6.131.9, cov-6.1.1, anyio-4.15.1
+collected 181 items
+
+tests/test_agent.py ........                                             [  4%]
+tests/test_api.py ..........................                             [ 18%]
+tests/test_concurrency.py ..                                             [ 19%]
+tests/test_contracts.py ................................................ [ 46%]
+...............                                                          [ 54%]
+tests/test_evaluator.py ............                                     [ 61%]
+tests/test_load.py ....................................                  [ 81%]
+tests/test_postgres_cli.py ...                                           [ 82%]
+tests/test_retrieval.py ....................                             [ 93%]
+tests/test_storage.py ......                                             [ 97%]
+tests/test_storage_contract.py .....                                     [100%]
+
+=============================== warnings summary ===============================
+../stage-sync-venv/lib/python3.11/site-packages/starlette/testclient.py:37
+  /Users/abhaykhot/Documents/Codex/2026-09-23/referenced-chatgpt-conversation-this-is-an/work/stage-sync-venv/lib/python3.11/site-packages/starlette/testclient.py:37: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
+    _PortalFactoryType = typing.Callable[[], typing.ContextManager[anyio.abc.BlockingPortal]]
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+================================ tests coverage ================================
+_______________ coverage: platform darwin, python 3.11.9-final-0 _______________
+
+Name                  Stmts   Miss Branch BrPart  Cover   Missing
+-----------------------------------------------------------------
+app/__init__.py           0      0      0      0   100%
+app/agent.py             22      0      0      0   100%
+app/evaluator.py          6      0      0      0   100%
+app/guardrails.py        17      0      8      0   100%
+app/main.py              42      0      6      0   100%
+app/models.py            45      0      0      0   100%
+app/planner.py            5      0      0      0   100%
+app/postgres.py          48      0      8      0   100%
+app/retrieval.py         20      0      6      0   100%
+app/storage.py           38      0      8      0   100%
+app/tools.py             37      0      6      0   100%
+scripts/__init__.py       0      0      0      0   100%
+scripts/load.py         109      0     20      0   100%
+-----------------------------------------------------------------
+TOTAL                   389      0     62      0   100%
+Coverage XML written to file coverage.xml
+Required test coverage of 100.0% reached. Total coverage: 100.00%
+======================== 181 passed, 1 warning in 3.40s ========================
