@@ -253,3 +253,88 @@ PostgreSQL database; without it, integration tests skip and the 100% gate cannot
 Tests mutate the migration checksum temporarily, so
 never point this at shared or production data. Pool transactions follow the
 [psycopg transaction contract](https://www.psycopg.org/psycopg3/docs/advanced/pool.html).
+
+### Stage 3: optional model-backed generation
+
+Default mode is deterministic. Set `AGENT_MODE=openai`, `OPENAI_API_KEY`, and
+`OPENAI_MODEL` explicitly to enable the Responses API adapter. It uses structured
+output, validates output locally, limits concurrency to four calls, limits output
+tokens to 1,500, and bounds retries to three attempts within a 30-second deadline.
+No tools are exposed to the model. Unsupported citations and invalid outputs fail
+with HTTP 502. Provider output is not treated as proof of factuality or safety.
+Token usage, model and prompt version are recorded; cost remains null.
+
+Contract source: [OpenAI structured outputs](https://developers.openai.com/api/docs/guides/structured-outputs).
+Normal tests simulate the HTTP provider. The real paid smoke is opt-in:
+`RUN_LIVE_PROVIDER_TEST=1 python -m pytest tests/test_provider.py -m live`.
+No live-provider success is claimed without that test and configured credentials.
+
+### Stage 4: persistent chunk retrieval
+
+With PostgreSQL configured and migrations applied, `POST /knowledge/documents`
+accepts `{"id":"guide","text":"..."}` and atomically replaces that source's chunks.
+Runs search both attached documents and stored chunks. Citations identify source
+and chunk; offsets identify exact original text. The corpus is capped at 1,000 chunks
+per owner and ingestion is serialized per owner for consistent limits.
+
+The local 256-dimensional hash embeddings encode lexical counts, **not semantic
+meaning**. Search uses a bounded exact scan with a lexical-intersection check.
+Chunking adds useful source coverage and persistence, not demonstrated semantic
+quality gains. Multilingual semantic retrieval and large-scale vector indexing
+remain future work. Re-ingest original documents to rebuild the index. The original
+source must be retained by the caller; only chunks are stored here.
+
+### Stage 5: access control and reviewed actions
+
+`API_TOKENS_JSON` maps strong bearer tokens (24+ characters) to objects containing
+`owner_id`, `actor`, and `role` (`user` or `reviewer`). Configure this outside git.
+Authenticated history and knowledge access are scoped to owner. With no tokens,
+the app remains a local demo identity without reviewer privileges.
+
+Create an immutable proposal with `POST /agent/runs/{id}/actions`, inspect it with
+`GET /actions/{id}`, then a reviewer posts `{"digest":"...","decision":"approve"}`
+to `/actions/{id}/approval`. Approval expires after one hour and binds the exact
+payload digest. Rejection is also supported. `POST /actions/{id}/deliver` sends
+only an approved proposal to the operator-configured HTTPS `ACTION_WEBHOOK_URL`.
+No request or model output can choose the destination. Redirects are disabled.
+
+Database row locks prevent concurrent duplicate transitions; an idempotency key is
+sent to the receiver. Timeout/non-2xx results become `unknown` and are not retried.
+A crash during delivery can leave `dispatching`; manual reconciliation is required.
+This is conservative at-most-one application dispatch, not exactly-once delivery.
+Tests use a sandbox HTTP transport; no real customer message was sent. Static tokens
+are a small deployment seam, not a replacement for a managed identity provider.
+
+### Stage 6: background jobs
+
+Export `DATABASE_URL` and optionally `REDIS_URL`, apply migrations, then run
+`python -m app.worker` alongside the API. `POST /agent/jobs` accepts the same request
+and a required `Idempotency-Key` header, returning HTTP 202 and a job ID. Poll
+`GET /agent/jobs/{id}`; read the completed run using its `result_id`. Cancel with
+`POST /agent/jobs/{id}/cancel` (this fences saving, but cannot undo provider billing).
+
+PostgreSQL is authoritative; Redis holds bounded wakeup notifications only. Workers
+poll when notifications are lost. Row locks and lease tokens fence stale workers.
+A job gets at most three attempts, a 60-second lease, a 45-second execution deadline,
+and exponential retry delay. Result persistence and completion are one transaction.
+There are at most 100 outstanding jobs per owner. Workers generate drafts only;
+approved external actions are never automatically replayed by this queue.
+
+Execution is at-least-once after a crash; model calls may repeat and incur charges.
+Only a current lease can commit one result. Cancellation does not immediately stop
+an already-running external model call. Run real job tests with both
+`TEST_DATABASE_URL` and `TEST_REDIS_URL` set to disposable services.
+
+### Stage 7: evaluation and observed feedback
+
+Run `python -m app.evaluation_suite --output evaluation.json` for seven versioned
+synthetic behavior cases. `--baseline previous.json` compares every metric per case
+on the identical dataset hash; an aggregate score cannot hide a regression. These
+check decisions, retrieval, citations, tools, and structure, not semantic truth.
+
+PostgreSQL-backed endpoints accept reviewer-only `POST /agent/runs/{id}/reviews`,
+observed `POST /agent/runs/{id}/outcomes`, and `GET /agent/runs/{id}/evaluation`.
+Reviews and outcome events reject conflicting duplicates. Missing data returns null,
+not zero. Reports read at most 1,000 reviews and 1,000 outcomes per run. See
+`docs/human-evaluation.md` for the rubric and limits. No real human-review campaign,
+automatic learning, causal uplift, or model-quality improvement is claimed.
