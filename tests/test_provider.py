@@ -8,7 +8,14 @@ import pytest
 from app.agent import DecisionAgent
 from app.main import create_app
 from app.models import AgentRequest
-from app.provider import OpenAIProvider, ProviderError
+from app.provider import (
+    DEFAULT_BASE_URL,
+    RESPONSE_SCHEMA,
+    GeneratedDecision,
+    OpenAIProvider,
+    ProviderError,
+    provider_from_env,
+)
 from app.storage import InMemoryRunStore
 
 
@@ -149,9 +156,18 @@ def test_transport_timeout_cancellation_and_recovery():
 
 
 def test_configuration_and_api_error(monkeypatch):
-    for key, model, attempts in [("", "x", 1), ("x", "", 1), ("x", "x", 4)]:
+    for key, model, attempts in [
+        ("", "x", 1),
+        ("x", "", 1),
+        ("x", "x", 4),
+        ("x", "x", True),
+        ("x", "x", 2.0),
+    ]:
         with pytest.raises(ValueError):
             OpenAIProvider(key, model, attempts=attempts)
+    for base_url in ["ftp://models.example", "https://", "models.example/v1"]:
+        with pytest.raises(ValueError, match="base URL"):
+            OpenAIProvider("x", "x", base_url=base_url)
     monkeypatch.setenv("AGENT_MODE", "openai")
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     with pytest.raises(ValueError):
@@ -186,3 +202,56 @@ def test_live_provider():
         assert decision.plan and metadata.output_tokens > 0
 
     asyncio.run(scenario())
+
+
+def test_configured_endpoint_and_environment(monkeypatch):
+    seen = []
+
+    def handler(req):
+        seen.append(str(req.url))
+        return httpx.Response(200, json=body())
+
+    async def scenario():
+        provider = OpenAIProvider(
+            "fake",
+            "local-model",
+            httpx.MockTransport(handler),
+            base_url="http://model-stub:8080/v1/",
+        )
+        await provider.generate(sample(), [])
+
+    asyncio.run(scenario())
+    assert seen == ["http://model-stub:8080/v1/responses"]
+
+    monkeypatch.delenv("AGENT_MODE", raising=False)
+    assert provider_from_env() is None
+    monkeypatch.setenv("AGENT_MODE", "typo")
+    with pytest.raises(ValueError, match="AGENT_MODE"):
+        provider_from_env()
+    monkeypatch.setenv("AGENT_MODE", "openai")
+    monkeypatch.setenv("OPENAI_API_KEY", "fake")
+    monkeypatch.setenv("OPENAI_MODEL", "test")
+    monkeypatch.delenv("OPENAI_BASE_URL", raising=False)
+    assert provider_from_env().url == DEFAULT_BASE_URL + "/responses"
+    monkeypatch.setenv("OPENAI_BASE_URL", "")
+    assert provider_from_env().url == DEFAULT_BASE_URL + "/responses"
+    monkeypatch.setenv("OPENAI_BASE_URL", "http://localhost:9000/v1")
+    assert provider_from_env().url == "http://localhost:9000/v1/responses"
+
+
+def test_wire_schema_stays_within_strict_structured_output_subset():
+    allowed = {"type", "properties", "required", "additionalProperties", "items"}
+
+    def keywords(node):
+        if isinstance(node, dict):
+            for key, value in node.items():
+                yield key
+                if key == "properties":
+                    for child in value.values():
+                        yield from keywords(child)
+                else:
+                    yield from keywords(value)
+
+    assert set(keywords(RESPONSE_SCHEMA)) <= allowed
+    assert set(RESPONSE_SCHEMA["required"]) == set(GeneratedDecision.model_fields)
+    assert set(RESPONSE_SCHEMA["properties"]) == set(GeneratedDecision.model_fields)

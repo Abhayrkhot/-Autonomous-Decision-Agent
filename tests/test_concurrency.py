@@ -70,10 +70,10 @@ async def test_300_interleaved_api_requests_are_isolated():
 @pytest.mark.anyio
 async def test_isolation_check_detects_deliberately_shared_request_state(monkeypatch):
     class RacyAgent(DecisionAgent):
-        async def run(self, request):
+        async def run(self, request, owner_id="local"):
             self.shared_request = request
             await asyncio.sleep(0)
-            return await super().run(self.shared_request)
+            return await super().run(self.shared_request, owner_id)
 
     # Negative control: the same assertions must catch an actual interleaving bug.
     monkeypatch.setattr("app.main.DecisionAgent", RacyAgent)

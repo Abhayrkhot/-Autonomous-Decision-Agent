@@ -215,18 +215,28 @@ def test_action_api_and_document_access(monkeypatch):
             client.get(f"/actions/{action_id}", headers=headers(USER)).status_code
             == 200
         )
+        assert (
+            client.get(f"/actions/{action_id}", headers=headers(OTHER)).status_code
+            == 404
+        )
+        assert (
+            client.post(
+                f"/agent/runs/{uuid4()}/actions", headers=headers(USER)
+            ).status_code
+            == 404
+        )
         approval = {"digest": action["digest"], "decision": "approve"}
         assert (
             client.post(
                 f"/actions/{action_id}/approval", json=approval, headers=headers(OTHER)
             ).status_code
-            == 409
+            == 404
         )
         assert (
             client.post(
                 f"/actions/{action_id}/approval", json=approval, headers=headers(USER)
             ).status_code
-            == 409
+            == 403
         )
         assert (
             client.post(

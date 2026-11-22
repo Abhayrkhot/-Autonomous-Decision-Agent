@@ -6,11 +6,20 @@ from psycopg.types.json import Jsonb
 from pydantic import Field, StrictBool
 
 from app.auth import Principal
+from app.errors import Forbidden, NotFound
 from app.models import RequestModel
 from app.postgres import PostgresRunStore
 
 
 class FeedbackError(ValueError):
+    pass
+
+
+class FeedbackNotFound(FeedbackError, NotFound):
+    pass
+
+
+class FeedbackForbidden(FeedbackError, Forbidden):
     pass
 
 
@@ -45,14 +54,14 @@ class FeedbackService:
 
     async def require_run(self, run_id: UUID, principal: Principal) -> None:
         if await self.store.get(run_id, principal.owner_id) is None:
-            raise FeedbackError("Run not found")
+            raise FeedbackNotFound("Run not found")
 
     async def review(
         self, run_id: UUID, review: HumanReview, principal: Principal
     ) -> HumanReview:
         await self.require_run(run_id, principal)
         if principal.role != "reviewer":
-            raise FeedbackError("Reviewer role required")
+            raise FeedbackForbidden("Reviewer role required")
         async with self.store.pool.connection() as conn:
             await conn.execute(
                 "INSERT INTO reviews(run_id,reviewer,body) VALUES (%s,%s,%s) ON CONFLICT DO NOTHING",
@@ -62,8 +71,10 @@ class FeedbackService:
                 "SELECT body FROM reviews WHERE run_id=%s AND reviewer=%s",
                 (run_id, principal.actor),
             )
-            if (await cursor.fetchone())[0] != review.model_dump():
-                raise FeedbackError("Review is immutable; conflicting duplicate")
+            stored = (await cursor.fetchone())[0]
+        # A conflicting duplicate inserted nothing, so checking after commit is safe.
+        if stored != review.model_dump():
+            raise FeedbackError("Review is immutable; conflicting duplicate")
         return review
 
     async def outcome(
@@ -88,8 +99,8 @@ class FeedbackService:
                 (principal.owner_id, outcome.event_id),
             )
             previous = await cursor.fetchone()
-            if previous != (run_id, payload):
-                raise FeedbackError("Feedback event conflicts with earlier observation")
+        if previous != (run_id, payload):
+            raise FeedbackError("Feedback event conflicts with earlier observation")
         return outcome
 
     async def report(self, run_id: UUID, principal: Principal) -> dict:

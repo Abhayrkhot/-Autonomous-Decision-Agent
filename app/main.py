@@ -5,17 +5,23 @@ from contextlib import asynccontextmanager
 from uuid import UUID
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+from psycopg import Error
+from psycopg_pool import PoolClosed, PoolTimeout
 
 from app.actions import Action, ActionError, ActionService, Approval
 from app.agent import DecisionAgent
 from app.auth import Principal, auth_dependency
+from app.errors import http_status
 from app.feedback import FeedbackError, FeedbackService, HumanReview, Outcome
 from app.guardrails import GuardrailViolation
 from app.jobs import JobError, JobService, JobStatus, QueueFull
 from app.knowledge import PostgresKnowledge
 from app.models import AgentRequest, AgentResponse, Document
+from app.operations import OperationalMiddleware
 from app.postgres import PostgresRunStore
-from app.provider import DecisionProvider, OpenAIProvider, ProviderError
+from app.provider import DecisionProvider, ProviderError, provider_from_env
 from app.storage import InMemoryRunStore, RunRecord, RunStore
 from app.tools import ToolRegistry
 
@@ -25,6 +31,11 @@ def create_app(
     registry: ToolRegistry | None = None,
     provider: DecisionProvider | None = None,
 ) -> FastAPI:
+    if os.getenv("DEPLOYMENT_MODE", "local") == "staging" and not os.getenv(
+        "API_TOKENS_JSON"
+    ):
+        raise ValueError("Staging requires configured authentication")
+    configured_provider = provider if provider is not None else provider_from_env()
     selected = (
         store
         if store is not None
@@ -56,15 +67,43 @@ def create_app(
     application = FastAPI(
         title="Autonomous Decision Agent", version="0.2.0", lifespan=lifespan
     )
+    metrics = {"requests": 0, "errors": 0, "duration_seconds_total": 0.0}
+    application.add_middleware(
+        OperationalMiddleware,
+        state=metrics,
+        body_limit=int(os.getenv("MAX_BODY_BYTES", "262144")),
+        rate_limit=int(os.getenv("RATE_LIMIT_PER_MINUTE", "1000")),
+    )
     authenticate = auth_dependency()
-    configured_provider = provider
-    if (
-        os.getenv("AGENT_MODE", "deterministic") == "openai"
-        and configured_provider is None
-    ):
-        configured_provider = OpenAIProvider(
-            os.environ.get("OPENAI_API_KEY", ""), os.environ.get("OPENAI_MODEL", "")
+
+    @application.exception_handler(RequestValidationError)
+    async def validation_error(request, exc):
+        return JSONResponse(
+            status_code=422,
+            content={
+                "detail": [
+                    {"loc": list(error["loc"]), "type": error["type"]}
+                    for error in exc.errors()
+                ]
+            },
         )
+
+    @application.get("/ready")
+    async def readiness():
+        if isinstance(selected, PostgresRunStore):
+            try:
+                async with selected.pool.connection() as conn:
+                    await conn.execute("SELECT 1 FROM schema_migrations LIMIT 1")
+            except (Error, PoolTimeout, PoolClosed):
+                raise HTTPException(503, "Database unavailable") from None
+        return {"status": "ready"}
+
+    @application.get("/metrics")
+    async def operational_metrics(principal: Principal = Depends(authenticate)):
+        if principal.role != "reviewer":
+            raise HTTPException(403, "Reviewer role required")
+        return dict(metrics)
+
     knowledge = (
         PostgresKnowledge(selected) if isinstance(selected, PostgresRunStore) else None
     )
@@ -130,11 +169,15 @@ def create_app(
             raise HTTPException(503, "Actions require PostgreSQL")
         return actions
 
-    @application.exception_handler(ActionError)
-    async def action_error(request, exc):
-        from fastapi.responses import JSONResponse
+    async def domain_error(request, exc):
+        # Not found 404, wrong role 403, invalid 422, full queue 429, conflicts 409.
+        default = 429 if isinstance(exc, QueueFull) else 409
+        return JSONResponse(
+            status_code=http_status(exc, default), content={"detail": str(exc)}
+        )
 
-        return JSONResponse(status_code=409, content={"detail": str(exc)})
+    for error in (ActionError, JobError, FeedbackError):
+        application.add_exception_handler(error, domain_error)
 
     @application.post("/agent/runs/{run_id}/actions", response_model=Action)
     async def propose_action(
@@ -165,15 +208,6 @@ def create_app(
             raise HTTPException(503, "Jobs require PostgreSQL")
         return jobs
 
-    @application.exception_handler(JobError)
-    async def job_error(request, exc):
-        from fastapi.responses import JSONResponse
-
-        return JSONResponse(
-            status_code=429 if isinstance(exc, QueueFull) else 409,
-            content={"detail": str(exc)},
-        )
-
     @application.post("/agent/jobs", response_model=JobStatus, status_code=202)
     async def submit_job(
         request: AgentRequest,
@@ -203,12 +237,6 @@ def create_app(
         if feedback is None:
             raise HTTPException(503, "Feedback requires PostgreSQL")
         return feedback
-
-    @application.exception_handler(FeedbackError)
-    async def feedback_error(request, exc):
-        from fastapi.responses import JSONResponse
-
-        return JSONResponse(status_code=409, content={"detail": str(exc)})
 
     @application.post("/agent/runs/{run_id}/reviews", response_model=HumanReview)
     async def review_run(

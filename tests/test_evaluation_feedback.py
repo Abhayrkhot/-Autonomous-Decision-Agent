@@ -164,7 +164,11 @@ def test_feedback_api(monkeypatch):
         assert client.get(f"/agent/runs/{run}/evaluation").json()["review_count"] == 1
         assert (
             client.post(f"/agent/runs/{uuid4()}/reviews", json=review).status_code
-            == 409
+            == 404
+        )
+        conflict = dict(review, usefulness=1)
+        assert (
+            client.post(f"/agent/runs/{run}/reviews", json=conflict).status_code == 409
         )
 
 

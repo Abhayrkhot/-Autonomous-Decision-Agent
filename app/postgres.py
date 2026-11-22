@@ -45,6 +45,8 @@ class PostgresRunStore:
             max_size=max_size,
             timeout=timeout,
             open=False,
+            # Validate on checkout so a PostgreSQL restart costs no failed requests.
+            check=AsyncConnectionPool.check_connection,
             kwargs={"connect_timeout": 5, "options": "-c statement_timeout=5000"},
         )
 

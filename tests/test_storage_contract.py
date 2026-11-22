@@ -4,6 +4,7 @@ from uuid import uuid4
 
 import httpx
 import pytest
+from psycopg import AsyncConnection
 from psycopg.errors import UniqueViolation
 from psycopg_pool import PoolTimeout
 
@@ -153,3 +154,25 @@ def test_postgres_application_lifecycle(monkeypatch):
         run_id = result.json()["run_id"]
     with TestClient(create_app()) as client:
         assert client.get(f"/agent/runs/{run_id}").status_code == 200
+
+
+@pytest.mark.integration
+@pytest.mark.skipif(not DSN, reason="TEST_DATABASE_URL required")
+def test_pool_replaces_connections_the_server_dropped():
+    async def scenario():
+        await migrate(DSN)
+        store = PostgresRunStore(DSN, max_size=1)
+        await store.open()
+        try:
+            async with store.pool.connection() as connection:
+                pid = connection.info.backend_pid
+            # Simulates a PostgreSQL restart or failover killing pooled sessions.
+            async with await AsyncConnection.connect(DSN, autocommit=True) as admin:
+                await admin.execute("SELECT pg_terminate_backend(%s)", (pid,))
+            assert await store.list(str(uuid4())) == []
+            async with store.pool.connection() as connection:
+                assert connection.info.backend_pid != pid
+        finally:
+            await store.close()
+
+    asyncio.run(scenario())

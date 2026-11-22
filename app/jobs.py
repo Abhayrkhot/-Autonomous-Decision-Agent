@@ -13,6 +13,7 @@ from redis.asyncio import Redis
 from redis.exceptions import RedisError
 
 from app.agent import DecisionAgent
+from app.errors import InvalidInput, NotFound
 from app.guardrails import validate_request
 from app.knowledge import PostgresKnowledge
 from app.models import AgentRequest, ResponseModel
@@ -26,6 +27,14 @@ class JobError(ValueError):
 
 
 class QueueFull(JobError):
+    pass
+
+
+class JobNotFound(JobError, NotFound):
+    pass
+
+
+class InvalidJob(JobError, InvalidInput):
     pass
 
 
@@ -85,7 +94,7 @@ class JobService:
     async def submit(self, request: AgentRequest, owner: str, key: str) -> JobStatus:
         validate_request(request)
         if not key.strip() or len(key) > 200:
-            raise JobError("Invalid idempotency key")
+            raise InvalidJob("Invalid idempotency key")
         payload = request.model_dump(mode="json")
         digest = hashlib.sha256(
             json.dumps(payload, sort_keys=True).encode()
@@ -130,7 +139,7 @@ class JobService:
             )
             row = await cur.fetchone()
             if not row:
-                raise JobError("Job not found")
+                raise JobNotFound("Job not found")
             return public(row)
 
     async def cancel(self, job_id: UUID, owner: str) -> JobStatus:

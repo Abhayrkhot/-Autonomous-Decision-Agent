@@ -1,0 +1,7 @@
+*
+!app/
+!app/**
+!migrations/
+!migrations/**
+!requirements.lock
+app/__pycache__/

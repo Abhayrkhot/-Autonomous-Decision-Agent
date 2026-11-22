@@ -1,0 +1,75 @@
+# Local staging stack: PostgreSQL, Redis, one-shot migrations, API and worker.
+#   POSTGRES_PASSWORD=... API_TOKENS_JSON='{...}' docker compose up --build -d
+# compose.e2e.yaml adds an HTTPS webhook sink and a Responses API stub for scripts/e2e.sh.
+name: autonomous-decision-agent
+x-environment: &environment
+  DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/agent
+  REDIS_URL: redis://redis:6379/0
+  API_TOKENS_JSON: ${API_TOKENS_JSON:?set API_TOKENS_JSON}
+  DEPLOYMENT_MODE: staging
+  RATE_LIMIT_PER_MINUTE: ${RATE_LIMIT_PER_MINUTE:-1000}
+  AGENT_MODE: ${AGENT_MODE:-deterministic}
+  OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+  OPENAI_MODEL: ${OPENAI_MODEL:-}
+  OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
+  ACTION_WEBHOOK_URL: ${ACTION_WEBHOOK_URL:-}
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: agent
+    volumes: [postgres-data:/var/lib/postgresql/data]
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U postgres -d agent]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+  redis:
+    image: redis:7-alpine
+    command: [redis-server, --appendonly, 'yes']
+    volumes: [redis-data:/data]
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+  migrate:
+    build: .
+    image: autonomous-decision-agent:local
+    environment: *environment
+    command: [python, -m, app.postgres]
+    healthcheck: {disable: true}
+    depends_on:
+      postgres: {condition: service_healthy}
+  api:
+    image: autonomous-decision-agent:local
+    environment: *environment
+    ports: ['127.0.0.1:${API_PORT:-8765}:8000']
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+      redis: {condition: service_healthy}
+  worker:
+    image: autonomous-decision-agent:local
+    environment: *environment
+    command: [python, -m, app.worker]
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    stop_grace_period: 30s
+    # The loop touches the heartbeat at least once per job; jobs time out after 45s.
+    healthcheck:
+      test: [CMD, python, -c, "import os, sys, time; sys.exit(time.time() - os.path.getmtime('/tmp/ada-worker-heartbeat') > 60)"]
+      interval: 5s
+      retries: 6
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+      redis: {condition: service_healthy}
+volumes:
+  postgres-data:
+  redis-data:

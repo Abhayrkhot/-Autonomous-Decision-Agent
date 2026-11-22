@@ -86,5 +86,5 @@ def main() -> None:
         raise SystemExit("Evaluation failed")
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover -- thin wrapper; main is tested directly.
     main()

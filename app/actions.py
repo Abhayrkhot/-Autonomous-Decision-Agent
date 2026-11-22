@@ -10,11 +10,20 @@ import httpx
 from pydantic import Field
 
 from app.auth import Principal
+from app.errors import Forbidden, NotFound
 from app.models import RequestModel, ResponseModel
 from app.postgres import PostgresRunStore
 
 
 class ActionError(ValueError):
+    pass
+
+
+class ActionNotFound(ActionError, NotFound):
+    pass
+
+
+class ActionForbidden(ActionError, Forbidden):
     pass
 
 
@@ -51,7 +60,7 @@ class ActionService:
     async def propose(self, run_id: UUID, principal: Principal) -> Action:
         record = await self.store.get(run_id, principal.owner_id)
         if record is None:
-            raise ActionError("Run not found")
+            raise ActionNotFound("Run not found")
         payload = {"run_id": str(run_id), "message": record.response.message}
         digest = hashlib.sha256(
             json.dumps(payload, sort_keys=True).encode()
@@ -100,7 +109,7 @@ class ActionService:
             )
             row = await cursor.fetchone()
             if not row:
-                raise ActionError("Action not found")
+                raise ActionNotFound("Action not found")
             return decode(row)
 
     async def transition(
@@ -118,7 +127,7 @@ class ActionService:
             )
             row = await cursor.fetchone()
             if not row:
-                raise ActionError("Action not found")
+                raise ActionNotFound("Action not found")
             action = decode(row)
             if action.status != expected or (
                 digest is not None and digest != action.digest
@@ -142,7 +151,7 @@ class ActionService:
         self, action_id: UUID, approval: Approval, principal: Principal
     ) -> Action:
         if principal.role != "reviewer":
-            raise ActionError("Reviewer role required")
+            raise ActionForbidden("Reviewer role required")
         return await self.transition(
             action_id,
             principal,
@@ -155,7 +164,6 @@ class ActionService:
         if not self.webhook:
             raise ActionError("No action webhook configured")
         action = await self.transition(action_id, principal, "approved", "dispatching")
-        status = "unknown"
         try:
             async with httpx.AsyncClient(
                 transport=self.transport, timeout=10, follow_redirects=False
@@ -165,8 +173,9 @@ class ActionService:
                     json=action.payload,
                     headers={"Idempotency-Key": str(action.action_id)},
                 )
-                if 200 <= response.status_code < 300:
-                    status = "sent"
+            # Only a 2xx confirms receipt; anything else may still have been processed.
+            status = "sent" if response.is_success else "unknown"
         except httpx.HTTPError:
-            pass  # Delivery may have happened: never retry an ambiguous side effect.
+            # Delivery may have happened: never retry an ambiguous side effect.
+            status = "unknown"
         return await self.transition(action_id, principal, "dispatching", status)
