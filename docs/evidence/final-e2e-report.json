@@ -1,0 +1,351 @@
+{
+  "started_utc": "2026-11-22T19:16:13Z",
+  "finished_utc": "2026-11-22T19:16:43Z",
+  "revision": "94a5bf0459c96ecb1dca61190e3f1a0c75b801fe",
+  "uncommitted_paths": 0,
+  "host": "Linux x86_64",
+  "docker_compose": "2.40.3+ds1-0ubuntu1",
+  "checks_total": 67,
+  "checks_passed": 67,
+  "checks": [
+    {
+      "phase": "core",
+      "check": "health",
+      "passed": true
+    },
+    {
+      "phase": "core",
+      "check": "ready",
+      "passed": true
+    },
+    {
+      "phase": "core",
+      "check": "request id header",
+      "passed": true
+    },
+    {
+      "phase": "core",
+      "check": "missing token is 401",
+      "passed": true
+    },
+    {
+      "phase": "core",
+      "check": "unknown token is 401",
+      "passed": true
+    },
+    {
+      "phase": "core",
+      "check": "knowledge ingested in overlapping chunks",
+      "passed": true
+    },
+    {
+      "phase": "core",
+      "check": "sync run",
+      "passed": true
+    },
+    {
+      "phase": "core",
+      "check": "persistent retrieval with source offsets",
+      "passed": true
+    },
+    {
+      "phase": "core",
+      "check": "citations come from retrieved evidence",
+      "passed": true
+    },
+    {
+      "phase": "core",
+      "check": "deterministic action from outcome signals",
+      "passed": true
+    },
+    {
+      "phase": "core",
+      "check": "message cites the playbook",
+      "passed": true
+    },
+    {
+      "phase": "core",
+      "check": "history lists the run",
+      "passed": true
+    },
+    {
+      "phase": "core",
+      "check": "run is readable by its owner",
+      "passed": true
+    },
+    {
+      "phase": "core",
+      "check": "run is hidden from another owner",
+      "passed": true
+    },
+    {
+      "phase": "core",
+      "check": "knowledge is owner scoped",
+      "passed": true
+    },
+    {
+      "phase": "core",
+      "check": "guardrail rejects injection",
+      "passed": true
+    },
+    {
+      "phase": "core",
+      "check": "strict types rejected without echoing input",
+      "passed": true
+    },
+    {
+      "phase": "core",
+      "check": "oversized body is 413",
+      "passed": true
+    },
+    {
+      "phase": "core",
+      "check": "job accepted with 202",
+      "passed": true
+    },
+    {
+      "phase": "core",
+      "check": "idempotent resubmission",
+      "passed": true
+    },
+    {
+      "phase": "core",
+      "check": "idempotency key reuse with new body is 409",
+      "passed": true
+    },
+    {
+      "phase": "core",
+      "check": "worker completed the job",
+      "passed": true
+    },
+    {
+      "phase": "core",
+      "check": "job result stored as a run",
+      "passed": true
+    },
+    {
+      "phase": "core",
+      "check": "job hidden from another owner",
+      "passed": true
+    },
+    {
+      "phase": "core",
+      "check": "action proposed as pending",
+      "passed": true
+    },
+    {
+      "phase": "core",
+      "check": "user cannot approve",
+      "passed": true
+    },
+    {
+      "phase": "core",
+      "check": "action hidden from another owner",
+      "passed": true
+    },
+    {
+      "phase": "core",
+      "check": "digest mismatch rejected",
+      "passed": true
+    },
+    {
+      "phase": "core",
+      "check": "delivery before approval rejected",
+      "passed": true
+    },
+    {
+      "phase": "core",
+      "check": "reviewer approves",
+      "passed": true
+    },
+    {
+      "phase": "core",
+      "check": "approved action delivered over HTTPS",
+      "passed": true
+    },
+    {
+      "phase": "core",
+      "check": "second delivery rejected",
+      "passed": true
+    },
+    {
+      "phase": "core",
+      "check": "webhook received exactly one delivery",
+      "passed": true
+    },
+    {
+      "phase": "core",
+      "check": "delivery carries the idempotency key and approved payload",
+      "passed": true
+    },
+    {
+      "phase": "core",
+      "check": "audit trail in order",
+      "passed": true
+    },
+    {
+      "phase": "core",
+      "check": "reviewer can reject",
+      "passed": true
+    },
+    {
+      "phase": "core",
+      "check": "rejected action cannot be delivered",
+      "passed": true
+    },
+    {
+      "phase": "core",
+      "check": "webhook still has one delivery",
+      "passed": true
+    },
+    {
+      "phase": "core",
+      "check": "user cannot submit a review",
+      "passed": true
+    },
+    {
+      "phase": "core",
+      "check": "reviewer review recorded",
+      "passed": true
+    },
+    {
+      "phase": "core",
+      "check": "identical review replay is idempotent",
+      "passed": true
+    },
+    {
+      "phase": "core",
+      "check": "conflicting review rejected",
+      "passed": true
+    },
+    {
+      "phase": "core",
+      "check": "outcome recorded",
+      "passed": true
+    },
+    {
+      "phase": "core",
+      "check": "outcome replay is idempotent",
+      "passed": true
+    },
+    {
+      "phase": "core",
+      "check": "conflicting outcome rejected",
+      "passed": true
+    },
+    {
+      "phase": "core",
+      "check": "evaluation report aggregates feedback",
+      "passed": true
+    },
+    {
+      "phase": "core",
+      "check": "metrics need the reviewer role",
+      "passed": true
+    },
+    {
+      "phase": "core",
+      "check": "metrics count requests",
+      "passed": true
+    },
+    {
+      "phase": "lifecycle",
+      "check": "worker exits 0 on SIGTERM well before the 30s grace period",
+      "passed": true,
+      "exit_code": 0,
+      "seconds": 0.66
+    },
+    {
+      "phase": "queued",
+      "check": "job waits while no worker runs",
+      "passed": true
+    },
+    {
+      "phase": "queued",
+      "check": "queued job cancelled",
+      "passed": true
+    },
+    {
+      "phase": "drain",
+      "check": "job submitted while worker was down completes after restart",
+      "passed": true
+    },
+    {
+      "phase": "drain",
+      "check": "cancelled job is never executed",
+      "passed": true
+    },
+    {
+      "phase": "recovery",
+      "check": "API ready again after PostgreSQL restart without its own restart",
+      "passed": true
+    },
+    {
+      "phase": "recovery",
+      "check": "runs survive the database restart",
+      "passed": true
+    },
+    {
+      "phase": "recovery",
+      "check": "action state survives",
+      "passed": true
+    },
+    {
+      "phase": "recovery",
+      "check": "new runs work on fresh pool connections",
+      "passed": true
+    },
+    {
+      "phase": "model",
+      "check": "earlier run survives container recreation",
+      "passed": true
+    },
+    {
+      "phase": "model",
+      "check": "model-backed sync run",
+      "passed": true
+    },
+    {
+      "phase": "model",
+      "check": "draft comes from the model",
+      "passed": true
+    },
+    {
+      "phase": "model",
+      "check": "generation metadata recorded",
+      "passed": true
+    },
+    {
+      "phase": "model",
+      "check": "model citations are retrieved evidence",
+      "passed": true
+    },
+    {
+      "phase": "model",
+      "check": "provider outage maps to 502 after bounded retries",
+      "passed": true
+    },
+    {
+      "phase": "model",
+      "check": "worker uses the model too",
+      "passed": true
+    },
+    {
+      "phase": "model",
+      "check": "job run records generation metadata",
+      "passed": true
+    },
+    {
+      "phase": "model",
+      "check": "every model call authenticated with strict schema",
+      "passed": true
+    },
+    {
+      "phase": "lifecycle",
+      "check": "worker exits 0 on SIGTERM well before the 30s grace period",
+      "passed": true,
+      "exit_code": 0,
+      "seconds": 0.76
+    }
+  ]
+}
