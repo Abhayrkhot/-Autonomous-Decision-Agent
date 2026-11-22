@@ -39,3 +39,26 @@ jobs:
           cache: pip
       - run: pip install -r requirements-dev.txt
       - run: bash scripts/verify.sh
+  audit:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+      - run: pip install pip-audit==2.10.1
+      # The image installs requirements.lock with --require-hashes; audit exactly that set.
+      - run: pip-audit --strict --require-hashes --disable-pip -r requirements.lock
+  e2e:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - run: bash e2e/run.sh
+      - if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-report
+          path: |
+            e2e-out/report.json
+            e2e-out/*.log
+          if-no-files-found: ignore
